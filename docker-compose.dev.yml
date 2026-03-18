@@ -1,4 +1,27 @@
 services:
+  # ========================================================================
+  # Ollama Service for LLM Hosting
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+    container_name: metamcp-ollama
+    ports:
+      - "11435:11434"           # Ollama API port (host 11435 -> container 11434)
+    environment:
+      # Ensure Ollama can reach MetamCP
+      MCP_API_URL: "http://app:12008"
+      # (optional: any other env vars your model uses)
+    volumes:
+      - .:/workspace            # Mount repo so model code can import metamcp clients
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - metamcp-network
+  
+  # ========================================================================
+  # MetamCP Application Service
   app:
     container_name: metamcp-dev
     build:

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/mnt/c/jsalm/Desktop",
+        "/mnt/c/jsalm/Downloads",
+        "/mnt/c/jsalm/Documents"
+      ]
+    }
+  }
+}

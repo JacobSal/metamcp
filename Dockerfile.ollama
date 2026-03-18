@@ -1,0 +1,33 @@
+# Build stage: install Node.js dependencies so the Ollama image can use MetamCP client code
+FROM node:20-alpine AS deps
+
+WORKDIR /workspace
+
+# Copy package/lock data first so dependencies can be cached
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy workspace source required to resolve workspace dependencies
+COPY apps/ apps/
+COPY packages/ packages/
+
+# Install all workspace deps (including those needed by the MetamCP client code)
+RUN corepack enable && pnpm install --frozen-lockfile
+
+# Final stage: use the official Ollama runtime image
+FROM ollama/ollama:latest
+
+WORKDIR /workspace
+
+# Copy node_modules from the build stage
+COPY --from=deps /workspace/node_modules ./node_modules
+
+# Copy the rest of the repo (node_modules is excluded by .dockerignore)
+COPY . .
+
+# Pull a base Ollama model (optional; adjust as desired)
+# NOTE: Ollama CLI requires the server to be running to manage models.
+# The model will be pulled on demand when the server starts.
+
+# Set default command / start Ollama
+# The base image already sets entrypoint to "ollama", so just pass args.
+CMD ["serve", "--port", "11434"]

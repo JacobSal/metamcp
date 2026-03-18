@@ -1,4 +1,109 @@
 services:
+  # ========================================================================
+  # Ollama Service for LLM Hosting
+  # ollama:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.ollama
+  #   container_name: metamcp-ollama
+  #   ports:
+  #     - "11435:11434"           # Ollama API port (host 11435 -> container 11434)
+  #   environment:
+  #     # Ensure Ollama can reach MetamCP
+  #     MCP_API_URL: "http://app:12008"
+  #     # (optional: any other env vars your model uses)
+  #   volumes:
+  #     - .:/workspace            # Mount repo so model code can import metamcp clients
+  #   depends_on:
+  #     app:
+  #       condition: service_started
+  #   networks:
+  #     - metamcp-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: metamcp-ollama
+    ports:
+      - "11435:11434"           # Ollama API port (host 11435 -> container 11434)
+    environment:
+      # Ensure Ollama can reach MetamCP
+      MCP_API_URL: "http://app:12008"
+      # (optional: any other env vars your model uses)
+    volumes:
+      - .:/workspace            # Mount repo so model code can import metamcp clients
+      - ollama_data:/root/.ollama  # Persist Ollama data (models, etc.)
+      - ./modelfiles:/modelfiles # Mount local model files for development
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${GPU_COUNT:-1}  # Use all available GPUs by default, or specify with env var
+              capabilities: [gpu]
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - metamcp-network
+  
+  # =========================================================================
+  # OpenWebUI Service for hosting the frontend
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:v0.8.6-cuda #ollama-webui/ollama-webui:main
+    container_name: metamcp-openwebui
+    ports:
+      - "3000:8080"           # OpenWebUI port (host 3000 -> container 8080)
+    environment:
+      # Ensure OpenWebUI can reach MetamCP and Ollama
+      MCP_API_URL: "http://app:12008"
+      OLLAMA_API_BASE_URL: "http://ollama:11434/api"
+      USE_CUDA: true
+      USE_OLLAMA: true
+    depends_on:
+      app:
+        condition: service_started
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - metamcp-network
+
+  # ========================================================================
+  # MCP Local Hosted Clients
+  github-mcp:
+    image: ghcr.io/github/github-mcp-server:latest
+    container_name: github-mcp
+    environment:
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN}
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    networks:
+      - metamcp-network
+
+  filesystem-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.filesystem
+    container_name: filesystem-mcp
+    restart: unless-stopped
+    environment:
+      FILESYSTEM_DIRECTORIES: ${FILESYSTEM_DIRECTORIES}
+    ports:
+      - "3002:3002"  # Assuming the custom build exposes 3000
+    networks:
+      - metamcp-network
+
+  context7-mcp:
+    build:
+      dockerfile: Dockerfile.context7
+    container_name: context7-mcp
+    restart: unless-stopped
+    networks:
+      - metamcp-network
+
+  # ========================================================================
+  # MetamCP Application Service
   app:
     container_name: metamcp
     image: ghcr.io/metatool-ai/metamcp:latest
@@ -191,6 +296,8 @@ services:
 volumes:
   postgres_data:
     driver: local
+  ollama_data:
+    name: ollama_data
 
 networks:
   metamcp-network:

@@ -1,0 +1,7 @@
+FROM node:18-alpine
+WORKDIR /app
+# Install the GitHub MCP server package globally.
+RUN npm install -g @modelcontextprotocol/server-filesystem
+# Expose the port that the GitHub MCP server will listen on.
+EXPOSE 3002
+CMD ["npx", "-y", "@modelcontextprotocol/server-filesystem", "${FILESYSTEM_DIRECTORIES}"]
